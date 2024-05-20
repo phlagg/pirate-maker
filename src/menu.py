@@ -70,6 +70,7 @@ class Button(pygame.sprite.Sprite):
         self.items = {'main': items, 'alt' : items_alt}
         self.index = 0
         self.main_active = True
+    
     def get_id(self):
         return self.items['main' if self.main_active else 'alt'][self.index][0]
     
