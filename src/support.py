@@ -1,5 +1,6 @@
 import pygame
 from os import walk
+from os.path import join
 
 
 def import_folder(path) -> list:
@@ -22,3 +23,11 @@ def import_folder_dict(path) -> dict:
             # add image_surf to the surface dict
             surface_dict[image_name.split(".")[0]] = image_surf
     return surface_dict
+
+
+def import_subfolder_dict(path)-> dict[dict]:
+    surface_dict = {
+        folder: import_folder(f'{path}/{folder}') for folder in list(walk(path))[0][1]
+        }
+    return surface_dict
+
