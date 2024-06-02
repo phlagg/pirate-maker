@@ -4,7 +4,7 @@ from typing import Iterable
 from pygame.math import Vector2 as vector
 from settings import *
 from support import *
-from sprites import GenericSprite, AnimatedSprite, Player, Coin, Particle, Spikes, Tooth, Shell, Block
+from sprites import GenericSprite, AnimatedSprite, Player, Coin, Particle, Spikes, Tooth, Shell, Block, Pearl
 from timer import Timer
 
 
@@ -20,11 +20,13 @@ class Level:
         self.coin_sprites = pygame.sprite.Group()
         self.collision_sprites = pygame.sprite.Group()
         self.shell_sprites = pygame.sprite.Group()
+        self.pearl_sprites = pygame.sprite.Group()
 
         self.build_level(grid, asset_dict)
 
         # animation support
         self.particle_surfs = asset_dict['particle']
+        self.pearl_surf = asset_dict['pearl']
 
     def build_level(self, grid, asset_dict) -> None:
         for layer_name, layer in grid.items():
@@ -61,14 +63,14 @@ class Level:
                                 pos= pos, 
                                 frames=asset_dict['shell'],
                                 groups=[self.all_sprites,self.collision_sprites,self.shell_sprites],
-                                pearl_surf = asset_dict['pearl'],
+                                create_pearl = self.create_pearl,
                                 damage_sprites = self.damage_sprites)
                     case 10: Shell(
                                 orientation='right', 
                                 pos= pos, 
                                 frames=asset_dict['shell'],
                                 groups=[self.all_sprites,self.collision_sprites,self.shell_sprites],
-                                pearl_surf = asset_dict['pearl'],
+                                create_pearl = self.create_pearl,
                                 damage_sprites = self.damage_sprites)
                     
                     # palm trees
@@ -92,7 +94,15 @@ class Level:
                     case '_': print('Error creating object')
         for sprite in self.shell_sprites:
             setattr(sprite, 'player', self.player)
-
+    
+    def create_pearl(self, pos, direction) -> None:
+        Pearl(
+            pos=pos,
+            groups= [self.all_sprites, self.damage_sprites, self.pearl_sprites],
+            surf= self.pearl_surf,
+            direction= direction,
+            speed= 150 )
+        
     def get_coins(self) -> None: 
         collided_coins = pygame.sprite.spritecollide(sprite=self.player, group=self.coin_sprites, dokill=True)
         sprite:Coin

@@ -1,8 +1,10 @@
 from pygame.math import Vector2 as vector
 
 from settings import *
+from settings import LEVEL_LAYERS
 from support import *
 from timer import Timer
+from typing import Callable
 
 class GenericSprite(pygame.sprite.Sprite):
     def __init__(self, pos, surf, groups, z = LEVEL_LAYERS['main']) -> None:
@@ -63,18 +65,20 @@ class Tooth(GenericSprite):
         self.rect.bottom = self.rect.top + TILE_SIZE
 
 class Shell(GenericSprite):
-    def __init__(self, orientation, pos, frames, groups, pearl_surf, damage_sprites) -> None:
+    def __init__(self, orientation, pos, frames, groups, create_pearl, damage_sprites) -> None:
         self.frame_index = 0
         self.orientation = orientation
+        self.pearl_direction = -1 # default left
         self.state = 'idle'
         self.frames = frames.copy()  # added copy to prevent from flipping assets for all instances
         if orientation =='right':
             self.flip_frames()
+            self.pearl_direction = 1
         surf = self.frames[self.state][self.frame_index]
         super().__init__(pos, surf, groups) 
         self.rect.bottom = self.rect.top+TILE_SIZE
         # attack
-        self.pearl_surf = pearl_surf
+        self.create_pearl: Callable[[], None] =  create_pearl
         self.has_shot = False
         self.attack_cooldown = Timer(2000)
         self.damage_sprites = damage_sprites
@@ -84,16 +88,57 @@ class Shell(GenericSprite):
         self.frame_index += ANIMATION_SPEED * dt
         if self.frame_index >= len(current_frames):
             self.frame_index = 0
+            if self.has_shot:
+                self.attack_cooldown.activate()
+                self.has_shot = False
         self.image = current_frames[int(self.frame_index)]
-    
+
+        if int(self.frame_index) == 2 and self.state == 'attack' and not self.has_shot:
+            self.create_pearl(self.rect.center, self.pearl_direction)
+            self.has_shot = True
+
+    def get_state(self) -> None:
+        shell_pos = vector(self.rect.center)
+        player_pos = vector(self.player.hitbox.center)
+        player_level = abs(shell_pos.y - player_pos.y) < 30
+        player_near = shell_pos.distance_to(player_pos) < 500
+        player_front = shell_pos.x < player_pos.x if self.pearl_direction > 0 \
+            else shell_pos.x  > player_pos.x
+        if player_near and player_front and player_level and not self.attack_cooldown.active :
+            self.state = 'attack'
+        else:
+            self.state = 'idle'
 
     def flip_frames(self) -> None:
         for key, surfs in self.frames.items():
             self.frames[key] = [pygame.transform.flip(surf, True, False) for surf in surfs]
 
     def update(self, dt) -> None:
+        self.get_state()
         self.animate(dt)
+        self.attack_cooldown.update()
 
+class Pearl(GenericSprite):
+    def __init__(self, pos, direction, surf, groups, speed) -> None:
+        super().__init__(pos, surf, groups)
+        self.image = surf
+        self.direction = direction
+        self.pearl_offset = vector(45*self.direction, 6)
+        self.rect = self.image.get_frect(center= pos + self.pearl_offset)
+        self.speed = speed
+        # self destruct
+        self.lifetime_timer = Timer(6000)
+        self.lifetime_timer.activate()
+        self.has_collided = False
+
+
+    def update(self, dt) -> None:
+        self.lifetime_timer.update()
+        if not self.lifetime_timer.active or self.has_collided:
+            self.kill()
+        else:
+            self.rect.x += self.speed * self.direction * dt
+            
 
 class Player(GenericSprite):
     def __init__(self, pos, assets, groups, collision_sprites) -> None:
